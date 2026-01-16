@@ -1,210 +1,294 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>AR Cube - Versão Simplificada</title>
+  <meta charset="UTF-8">
+  <title>AR Three.js - Realidade Aumentada</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+  <script type="importmap">
+    {
+      "imports": {
+        "three": "https://unpkg.com/three@0.156.1/build/three.module.js",
+        "three/addons/": "https://unpkg.com/three@0.156.1/examples/jsm/"
+      }
+    }
+  </script>
+  <style>
+    body {
+      margin: 0;
+      padding: 0;
+      overflow: hidden;
+      background-color: #000;
+      font-family: Arial, sans-serif;
+    }
     
-    <!-- A-Frame -->
-    <script src="https://aframe.io/releases/1.4.0/aframe.min.js"></script>
+    #info {
+      position: absolute;
+      top: 10px;
+      left: 10px;
+      color: white;
+      background: rgba(0,0,0,0.8);
+      padding: 15px;
+      border-radius: 8px;
+      z-index: 100;
+      font-size: 14px;
+      max-width: 300px;
+    }
     
-    <!-- AR.js -->
-    <script src="https://jeromeetienne.github.io/AR.js/aframe/build/aframe-ar.min.js"></script>
+    #arButton {
+      position: absolute;
+      bottom: 20px;
+      left: 50%;
+      transform: translateX(-50%);
+      padding: 15px 30px;
+      background: #4CAF50;
+      color: white;
+      border: none;
+      border-radius: 25px;
+      font-size: 16px;
+      cursor: pointer;
+      z-index: 100;
+    }
     
-    <style>
-        body {
-            margin: 0;
-            font-family: Arial, sans-serif;
-        }
-        
-        #info {
-            position: fixed;
-            top: 10px;
-            left: 10px;
-            right: 10px;
-            background: rgba(0, 0, 0, 0.8);
-            color: white;
-            padding: 15px;
-            border-radius: 10px;
-            z-index: 9999;
-            font-size: 12px;
-            text-align: center;
-        }
-        
-        #info h3 {
-            margin: 0 0 10px 0;
-            color: #00ff88;
-        }
-        
-        .hide { display: none; }
-        
-        button {
-            background: #ff4444;
-            color: white;
-            border: none;
-            padding: 8px 16px;
-            border-radius: 5px;
-            margin: 5px;
-            cursor: pointer;
-        }
-        
-        .success { background: #28a745 !important; }
-    </style>
+    #arButton:hover {
+      background: #45a049;
+    }
+    
+    #arButton:disabled {
+      background: #666;
+      cursor: not-allowed;
+    }
+  </style>
 </head>
-<body style='margin : 0px; overflow: hidden;'>
+<body>
+  <div id="info">Iniciando AR Experience...</div>
+  <button id="arButton">🚀 Iniciar AR</button>
+  
+  <script type="module">
+    import * as THREE from 'three';
+    import { ARButton } from 'three/addons/webxr/ARButton.js';
+    import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+
+    console.log('🚀 AR Experience iniciando...', THREE.REVISION);
     
-    <div id="info">
-        <h3>🔄 Carregando AR...</h3>
-        <p>Aguarde e permita acesso à câmera</p>
-        <button onclick="hideInfo()">OK</button>
-        <button class="success" onclick="testCamera()">Testar Câmera</button>
-    </div>
+    const infoDiv = document.getElementById('info');
+    const arButton = document.getElementById('arButton');
+    let isARActive = false;
+    let placedModels = []; // Array para armazenar modelos colocados
+    let modelTemplate = null; // Template do modelo para clonar
+    
+    infoDiv.innerHTML = '⚙️ Three.js carregado! Versão: ' + THREE.REVISION + '<br>📱 Preparando AR...';
 
-    <!-- Cena AR Simplificada -->
-    <a-scene 
-        arjs='sourceType: webcam; trackingMethod: best; sourceWidth:1280; sourceHeight:960; displayWidth: 1280; displayHeight: 960; debugUIEnabled: false;' 
-        embedded
-        vr-mode-ui="enabled: false">
-        
-        <a-marker preset='hiro'>
-            <!-- Cubo Principal -->
-            <a-box 
-                position='0 0.5 0' 
-                material='color: #4CC3D9; transparent: false; opacity: 1;'
-                animation="property: rotation; to: 0 360 0; loop: true; dur: 5000">
-                
-                <!-- Texto -->
-                <a-text 
-                    value="AR" 
-                    position="0 0 0.51" 
-                    align="center" 
-                    color="white" 
-                    scale="2 2 2">
-                </a-text>
-            </a-box>
-            
-            <!-- Cubo menor -->
-            <a-box 
-                position='1.5 0.5 0' 
-                scale='0.5 0.5 0.5' 
-                material='color: red;'
-                animation="property: rotation; to: 360 0 360; loop: true; dur: 3000">
-            </a-box>
-            
-            <!-- Esfera -->
-            <a-sphere 
-                position='-1.5 0.5 0' 
-                radius='0.3' 
-                material='color: yellow;'
-                animation="property: position; to: -1.5 2 0; loop: true; dur: 2000; dir: alternate">
-            </a-sphere>
-            
-        </a-marker>
-        
-        <a-entity camera></a-entity>
-    </a-scene>
+    // Criar cena
+    const scene = new THREE.Scene();
 
-    <script>
-        let cameraWorking = false;
-        
-        function hideInfo() {
-            document.getElementById('info').classList.add('hide');
+    // Câmera
+    const camera = new THREE.PerspectiveCamera(70, window.innerWidth / window.innerHeight, 0.01, 20);
+
+    // Renderer com suporte AR
+    const renderer = new THREE.WebGLRenderer({ 
+      antialias: true, 
+      alpha: true 
+    });
+    renderer.setPixelRatio(window.devicePixelRatio);
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.xr.enabled = true;
+    document.body.appendChild(renderer.domElement);
+
+    // Verificar suporte AR
+    if ('xr' in navigator) {
+      navigator.xr.isSessionSupported('immersive-ar').then((supported) => {
+        if (supported) {
+          arButton.style.display = 'block';
+          infoDiv.innerHTML += '<br>✅ AR suportado!';
+        } else {
+          arButton.innerHTML = '❌ AR não suportado';
+          arButton.disabled = true;
+          infoDiv.innerHTML += '<br>❌ AR não suportado neste dispositivo';
         }
+      });
+    } else {
+      arButton.innerHTML = '❌ WebXR não suportado';
+      arButton.disabled = true;
+      infoDiv.innerHTML += '<br>❌ WebXR não suportado neste navegador';
+    }
+
+    // Luz para AR
+    const ambientLight = new THREE.AmbientLight(0xffffff, 0.8);
+    scene.add(ambientLight);
+
+    const directionalLight = new THREE.DirectionalLight(0xffffff, 1);
+    directionalLight.position.set(0, 1, 1);
+    scene.add(directionalLight);
+
+    // Raycaster para detectar onde tocar
+    const raycaster = new THREE.Raycaster();
+    const mouse = new THREE.Vector2();
+
+    // Carregar modelo GLB como template
+    const loader = new GLTFLoader();
+    
+    infoDiv.innerHTML = '🔄 Carregando modelo 3D...';
+    console.log('🔄 Iniciando carregamento do modelo...');
+    
+    // Verificar se o arquivo existe primeiro
+    fetch('model.glb')
+      .then(response => {
+        console.log('📁 Status do arquivo model.glb:', response.status);
+        if (!response.ok) {
+          throw new Error(`Arquivo não encontrado: ${response.status} ${response.statusText}`);
+        }
+        return response.blob();
+      })
+      .then(blob => {
+        console.log('📏 Tamanho do arquivo GLB:', blob.size, 'bytes');
         
-        async function testCamera() {
-            const infoDiv = document.getElementById('info');
+        // Carregar o modelo como template
+        loader.load(
+          'model.glb',
+          function (gltf) {
+            modelTemplate = gltf.scene.clone();
             
-            try {
-                infoDiv.innerHTML = '<h3>🔍 Testando câmera...</h3><p>Aguarde...</p>';
-                
-                // Verificar se getUserMedia existe
-                if (!navigator.mediaDevices?.getUserMedia) {
-                    throw new Error('getUserMedia não suportado neste navegador');
-                }
-                
-                // Tentar acessar a câmera
-                const stream = await navigator.mediaDevices.getUserMedia({ 
-                    video: { 
-                        facingMode: { ideal: 'environment' },
-                        width: { ideal: 640 },
-                        height: { ideal: 480 }
-                    } 
-                });
-                
-                // Sucesso!
-                cameraWorking = true;
-                stream.getTracks().forEach(track => track.stop());
-                
-                infoDiv.innerHTML = `
-                    <h3>✅ Câmera OK!</h3>
-                    <p>Agora aponte para o marcador Hiro</p>
-                    <p><small>Marcador: quadrado preto com padrão branco</small></p>
-                    <button onclick="hideInfo()">Começar AR</button>
-                    <button onclick="showMarkerInfo()">Ver Marcador</button>
-                `;
-                
-            } catch (error) {
-                console.error('Erro câmera:', error);
-                infoDiv.innerHTML = `
-                    <h3>❌ Erro na Câmera</h3>
-                    <p><strong>Problema:</strong> ${error.message}</p>
-                    <p><strong>Soluções:</strong></p>
-                    <ul style="text-align: left; font-size: 11px;">
-                        <li>Permita acesso à câmera</li>
-                        <li>Use HTTPS (GitHub Pages funciona)</li>
-                        <li>Feche outras apps que usam câmera</li>
-                        <li>Recarregue a página</li>
-                    </ul>
-                    <button onclick="location.reload()">Recarregar</button>
-                `;
+            // Ajustar escala do template
+            modelTemplate.scale.set(0.1, 0.1, 0.1); // Modelo menor para AR
+            
+            // Centralizar modelo
+            const box = new THREE.Box3().setFromObject(modelTemplate);
+            const center = box.getCenter(new THREE.Vector3());
+            modelTemplate.position.sub(center);
+            
+            console.log('✅ Template do modelo carregado!');
+            infoDiv.innerHTML = '✅ Modelo carregado!<br>🎯 Toque no botão AR para começar';
+          },
+          function (progress) {
+            if (progress.total > 0) {
+              const percentage = Math.round((progress.loaded / progress.total) * 100);
+              infoDiv.innerHTML = `🔄 Carregando: ${percentage}%`;
             }
-        }
+          },
+          function (error) {
+            console.error('❌ Erro ao carregar modelo:', error);
+            
+            // Fallback: criar cubo como template
+            console.log('🔄 Criando cubo como fallback...');
+            const geometry = new THREE.BoxGeometry(0.1, 0.1, 0.1);
+            const material = new THREE.MeshStandardMaterial({ color: 0xff4444 });
+            modelTemplate = new THREE.Mesh(geometry, material);
+            
+            infoDiv.innerHTML = '⚠️ Usando cubo como modelo<br>🎯 Toque no botão AR para começar';
+          }
+        );
+      })
+      .catch(fetchError => {
+        console.error('❌ Erro ao acessar arquivo:', fetchError);
         
-        function showMarkerInfo() {
-            document.getElementById('info').innerHTML = `
-                <h3>🎯 Marcador Hiro</h3>
-                <p>Procure por um quadrado preto com bordas brancas e um padrão específico dentro</p>
-                <p>Você pode:</p>
-                <ul style="text-align: left; font-size: 11px;">
-                    <li>Usar o arquivo marcador.html</li>
-                    <li>Buscar "hiro marker" no Google</li>
-                    <li>Imprimir ou mostrar em outra tela</li>
-                </ul>
-                <button onclick="hideInfo()">Entendi</button>
-            `;
-        }
+        // Fallback: criar cubo como template
+        const geometry = new THREE.BoxGeometry(0.1, 0.1, 0.1);
+        const material = new THREE.MeshStandardMaterial({ color: 0xff4444 });
+        modelTemplate = new THREE.Mesh(geometry, material);
         
-        // Auto-inicializar
-        window.addEventListener('load', () => {
-            setTimeout(() => {
-                if (!cameraWorking) {
-                    testCamera();
-                }
-            }, 2000);
+        infoDiv.innerHTML = '⚠️ Modelo não encontrado, usando cubo<br>🎯 Toque no botão AR para começar';
+      });
+
+    // Função para colocar modelo na posição tocada
+    function placeModel(event) {
+      if (!isARActive || !modelTemplate) return;
+      
+      // Calcular posição do toque
+      mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
+      mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
+      
+      // Criar raio da câmera
+      raycaster.setFromCamera(mouse, camera);
+      
+      // Criar um plano invisível a 1 metro da câmera
+      const planeGeometry = new THREE.PlaneGeometry(10, 10);
+      const planeMaterial = new THREE.MeshBasicMaterial({ visible: false });
+      const plane = new THREE.Mesh(planeGeometry, planeMaterial);
+      plane.position.set(0, 0, -1);
+      plane.lookAt(camera.position);
+      scene.add(plane);
+      
+      // Verificar intersecção com o plano
+      const intersects = raycaster.intersectObject(plane);
+      
+      if (intersects.length > 0) {
+        // Clonar modelo e posicionar
+        const newModel = modelTemplate.clone();
+        newModel.position.copy(intersects[0].point);
+        
+        // Adicionar pequena rotação aleatória
+        newModel.rotation.y = Math.random() * Math.PI * 2;
+        
+        scene.add(newModel);
+        placedModels.push(newModel);
+        
+        console.log('🎯 Modelo colocado na posição:', intersects[0].point);
+        infoDiv.innerHTML = `🎯 Modelos colocados: ${placedModels.length}<br>👆 Toque na tela para colocar mais`;
+      }
+      
+      // Remover plano temporário
+      scene.remove(plane);
+    }
+    
+    // Eventos de toque/clique
+    function onTouch(event) {
+      event.preventDefault();
+      if (event.touches && event.touches.length > 0) {
+        placeModel(event.touches[0]);
+      } else {
+        placeModel(event);
+      }
+    }
+    
+    // Configurar botão AR
+    arButton.addEventListener('click', () => {
+      if (!isARActive) {
+        // Iniciar sessão AR
+        navigator.xr.requestSession('immersive-ar', {
+          requiredFeatures: ['local'],
+          optionalFeatures: ['dom-overlay'],
+          domOverlay: { root: document.body }
+        }).then((session) => {
+          renderer.xr.setSession(session);
+          isARActive = true;
+          arButton.innerHTML = '👆 Toque na tela para colocar';
+          infoDiv.innerHTML = '🚀 AR Ativo!<br>👆 Toque na tela onde quer colocar o modelo';
+          
+          // Adicionar eventos de toque
+          renderer.domElement.addEventListener('click', onTouch);
+          renderer.domElement.addEventListener('touchstart', onTouch);
+          
+          session.addEventListener('end', () => {
+            isARActive = false;
+            arButton.innerHTML = '🚀 Iniciar AR';
+            infoDiv.innerHTML = 'AR finalizado.<br>🎯 Modelos colocados: ' + placedModels.length;
+            
+            // Remover eventos
+            renderer.domElement.removeEventListener('click', onTouch);
+            renderer.domElement.removeEventListener('touchstart', onTouch);
+          });
+        }).catch((error) => {
+          console.error('Erro ao iniciar AR:', error);
+          infoDiv.innerHTML = '❌ Erro ao iniciar AR: ' + error.message;
         });
-        
-        // Detectar marcador
-        document.addEventListener('DOMContentLoaded', () => {
-            setTimeout(() => {
-                const marker = document.querySelector('a-marker');
-                if (marker) {
-                    marker.addEventListener('markerFound', () => {
-                        console.log('Marcador encontrado!');
-                        if (!document.getElementById('info').classList.contains('hide')) {
-                            document.getElementById('info').innerHTML = `
-                                <h3>🎉 Marcador Detectado!</h3>
-                                <p>Veja o cubo 3D!</p>
-                                <button onclick="hideInfo()">Ocultar</button>
-                            `;
-                        }
-                    });
-                    
-                    marker.addEventListener('markerLost', () => {
-                        console.log('Marcador perdido');
-                    });
-                }
-            }, 3000);
-        });
-    </script>
+      }
+    });
+
+    // Loop de renderização AR
+    function animate() {
+      renderer.setAnimationLoop(() => {
+        renderer.render(scene, camera);
+      });
+    }
+
+    // Redimensionamento
+    window.addEventListener('resize', () => {
+      camera.aspect = window.innerWidth / window.innerHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(window.innerWidth, window.innerHeight);
+    });
+
+    animate();
+  </script>
 </body>
 </html>
