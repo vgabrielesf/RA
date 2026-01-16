@@ -119,6 +119,13 @@
     let moveMode = false;
     let originalScale = 0.3;
     
+    // Variáveis para controle de gestos
+    let isRotating = false;
+    let lastTouchX = 0;
+    let lastTouchY = 0;
+    let initialDistance = 0;
+    let isScaling = false;
+    
     infoDiv.innerHTML = '⚙️ Three.js carregado! Versão: ' + THREE.REVISION + '<br>📹 Ativando câmera...';
 
     // Criar cena
@@ -284,7 +291,7 @@
       hasModelPlaced = true;
       
       console.log('🎯 Modelo colocado na AR:', model.position);
-      infoDiv.innerHTML = '✅ Modelo na AR!<br>🎮 Use os controles para ajustar<br>📱 Mova o dispositivo para ver ângulos';
+      infoDiv.innerHTML = '✅ Modelo na AR!<br>👆 1 dedo = girar | ✌️ 2 dedos = zoom<br>🎮 Use os controles para mover';
       arButton.innerHTML = '🗑️ Remover modelo';
       arButton.style.background = '#f44336';
       controls.style.display = 'flex'; // Mostrar controles
@@ -338,10 +345,101 @@
         console.log('🚚 Modelo movido para:', model.position);
       }
     }
+
+    // Gestos de toque para rotação e zoom
+    function onTouchStart(event) {
+      event.preventDefault();
+      
+      if (!hasModelPlaced || !model || moveMode) return;
+      
+      if (event.touches.length === 1) {
+        // Um dedo - iniciar rotação
+        isRotating = true;
+        lastTouchX = event.touches[0].clientX;
+        lastTouchY = event.touches[0].clientY;
+        
+        infoDiv.innerHTML = '🔄 Rotacionando modelo...<br>👆 Use 2 dedos para zoom';
+      } else if (event.touches.length === 2) {
+        // Dois dedos - iniciar zoom
+        isScaling = true;
+        isRotating = false;
+        
+        const touch1 = event.touches[0];
+        const touch2 = event.touches[1];
+        initialDistance = Math.sqrt(
+          Math.pow(touch2.clientX - touch1.clientX, 2) + 
+          Math.pow(touch2.clientY - touch1.clientY, 2)
+        );
+        
+        infoDiv.innerHTML = '🔍 Zoom ativo...<br>✌️ Afaste/aproxime os dedos';
+      }
+    }
+
+    function onTouchMove(event) {
+      event.preventDefault();
+      
+      if (!hasModelPlaced || !model || moveMode) return;
+      
+      if (isRotating && event.touches.length === 1) {
+        // Rotacionar modelo com um dedo
+        const deltaX = event.touches[0].clientX - lastTouchX;
+        const deltaY = event.touches[0].clientY - lastTouchY;
+        
+        // Rotação baseada no movimento do dedo
+        model.rotation.y += deltaX * 0.01;
+        model.rotation.x += deltaY * 0.01;
+        
+        // Limitar rotação X para não ficar de cabeça para baixo
+        model.rotation.x = Math.max(-Math.PI/2, Math.min(Math.PI/2, model.rotation.x));
+        
+        lastTouchX = event.touches[0].clientX;
+        lastTouchY = event.touches[0].clientY;
+        
+      } else if (isScaling && event.touches.length === 2) {
+        // Zoom com pinça (dois dedos)
+        const touch1 = event.touches[0];
+        const touch2 = event.touches[1];
+        const currentDistance = Math.sqrt(
+          Math.pow(touch2.clientX - touch1.clientX, 2) + 
+          Math.pow(touch2.clientY - touch1.clientY, 2)
+        );
+        
+        const scaleChange = currentDistance / initialDistance;
+        const currentScale = model.scale.x;
+        const newScale = Math.max(0.1, Math.min(2.0, currentScale * scaleChange));
+        
+        model.scale.setScalar(newScale);
+        initialDistance = currentDistance;
+        
+        const percentage = (newScale / originalScale * 100).toFixed(0);
+        infoDiv.innerHTML = `🔍 Zoom: ${percentage}%<br>✌️ Afaste/aproxime os dedos`;
+      }
+    }
+
+    function onTouchEnd(event) {
+      event.preventDefault();
+      
+      if (isRotating || isScaling) {
+        isRotating = false;
+        isScaling = false;
+        
+        if (model) {
+          const percentage = (model.scale.x / originalScale * 100).toFixed(0);
+          infoDiv.innerHTML = `✅ Modelo ajustado!<br>🔍 Tamanho: ${percentage}%<br>🎮 Use os controles para mais opções`;
+        }
+      }
+      
+      // Se não tem toques ativos e não está em modo mover, chamar onTouch para outras ações
+      if (event.touches.length === 0 && !moveMode) {
+        // Permite colocar modelo se não tiver sido colocado ainda
+      }
+    }
     
     // Configurar eventos
     renderer.domElement.addEventListener('click', onTouch);
-    renderer.domElement.addEventListener('touchstart', onTouch);
+    renderer.domElement.addEventListener('touchstart', onTouchStart, { passive: false });
+    renderer.domElement.addEventListener('touchmove', onTouchMove, { passive: false });
+    renderer.domElement.addEventListener('touchend', onTouchEnd, { passive: false });
     
     // Configurar botão principal
     arButton.addEventListener('click', () => {
@@ -362,7 +460,7 @@
         infoDiv.innerHTML = '📱 Modo mover ativo!<br>👆 Toque na tela para reposicionar';
       } else {
         moveBtn.style.background = 'rgba(0,0,0,0.8)';
-        infoDiv.innerHTML = '✅ Modelo na AR!<br>🎮 Use os controles para ajustar';
+        infoDiv.innerHTML = '✅ Modelo na AR!<br>👆 1 dedo = girar | ✌️ 2 dedos = zoom';
       }
     });
 
@@ -374,7 +472,7 @@
       model.scale.setScalar(newScale);
       
       console.log('🔍+ Modelo aumentado para:', newScale);
-      infoDiv.innerHTML = `🔍 Tamanho: ${(newScale/originalScale*100).toFixed(0)}%<br>🎮 Use os controles para ajustar`;
+      infoDiv.innerHTML = `🔍 Tamanho: ${(newScale/originalScale*100).toFixed(0)}%<br>👆 1 dedo = girar | ✌️ 2 dedos = zoom`;
     });
 
     scaleDownBtn.addEventListener('click', () => {
@@ -385,7 +483,7 @@
       model.scale.setScalar(newScale);
       
       console.log('🔍- Modelo diminuído para:', newScale);
-      infoDiv.innerHTML = `🔍 Tamanho: ${(newScale/originalScale*100).toFixed(0)}%<br>🎮 Use os controles para ajustar`;
+      infoDiv.innerHTML = `🔍 Tamanho: ${(newScale/originalScale*100).toFixed(0)}%<br>👆 1 dedo = girar | ✌️ 2 dedos = zoom`;
     });
 
     resetBtn.addEventListener('click', () => {
@@ -393,6 +491,9 @@
       
       // Resetar escala
       model.scale.setScalar(originalScale);
+      
+      // Resetar rotação
+      model.rotation.set(0, 0, 0);
       
       // Resetar posição (colocar na frente da câmera)
       const direction = new THREE.Vector3(0, 0, -2);
@@ -403,17 +504,15 @@
       moveBtn.style.background = 'rgba(0,0,0,0.8)';
       
       console.log('🔄 Modelo resetado');
-      infoDiv.innerHTML = '🔄 Modelo resetado!<br>🎮 Use os controles para ajustar';
+      infoDiv.innerHTML = '🔄 Modelo resetado!<br>👆 1 dedo = girar | ✌️ 2 dedos = zoom';
     });
 
     // Loop de renderização
     function animate() {
       requestAnimationFrame(animate);
       
-      // Rotacionar modelo se existir
-      if (model) {
-        model.rotation.y += 0.005;
-      }
+      // Modelo fica parado - sem rotação automática
+      // Usuário controla rotação com gestos de toque
       
       renderer.render(scene, camera);
     }
