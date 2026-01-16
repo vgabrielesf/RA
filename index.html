@@ -55,22 +55,27 @@
     <!-- Instruções -->
     <div id="instructions">
         <h3>📱 Como usar a Realidade Aumentada:</h3>
-        <p>1. Aponte a câmera para o marcador (imagem pattern-marker.png)</p>
-        <p>2. Mantenha o celular estável</p>
-        <p>3. O cubo 3D aparecerá sobre o marcador</p>
-        <p>4. Mova o celular ao redor para ver diferentes ângulos</p>
+        <p>1. <strong>Permita acesso à câmera</strong> quando solicitado</p>
+        <p>2. Aponte a câmera para o marcador Hiro</p>
+        <p>3. Mantenha o celular estável e bem iluminado</p>
+        <p>4. O cubo 3D aparecerá sobre o marcador</p>
+        <p><small>⚠️ <strong>Importante:</strong> Use HTTPS ou GitHub Pages para funcionar no celular</small></p>
         <button id="close-btn" onclick="closeInstructions()">Entendi!</button>
     </div>
 
     <!-- Cena AR -->
     <a-scene 
         embedded 
-        arjs="sourceType: webcam; debugUIEnabled: false; detectionMode: mono_and_matrix; matrixCodeType: 3x3;"
+        arjs="sourceType: webcam; sourceWidth: 1280; sourceHeight: 960; displayWidth: 1280; displayHeight: 960; debugUIEnabled: false; detectionMode: mono_and_matrix; matrixCodeType: 3x3;"
         vr-mode-ui="enabled: false"
-        renderer="logarithmicDepthBuffer: true;">
+        renderer="colorManagement: true; sortObjects: true;"
+        loading-screen="enabled: false;">
+        
+        <!-- Assets -->
+        <a-assets></a-assets>
         
         <!-- Configurações da câmera AR -->
-        <a-camera gps-camera rotation-reader arjs-camera></a-camera>
+        <a-entity camera></a-entity>
         
         <!-- Marcador AR -->
         <a-marker 
@@ -182,37 +187,98 @@
     </a-scene>
 
     <script>
+        // Verificar suporte da câmera primeiro
+        async function checkCameraSupport() {
+            try {
+                if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+                    throw new Error('getUserMedia não suportado');
+                }
+                
+                // Testar acesso à câmera
+                const stream = await navigator.mediaDevices.getUserMedia({ 
+                    video: { 
+                        facingMode: 'environment',
+                        width: { ideal: 1280 },
+                        height: { ideal: 960 }
+                    } 
+                });
+                
+                // Fechar o stream de teste
+                stream.getTracks().forEach(track => track.stop());
+                console.log('Câmera disponível!');
+                return true;
+                
+            } catch (error) {
+                console.error('Erro na câmera:', error);
+                showCameraError(error.message);
+                return false;
+            }
+        }
+        
+        function showCameraError(message) {
+            const instructions = document.getElementById('instructions');
+            instructions.innerHTML = `
+                <h3>❌ Erro na Câmera</h3>
+                <p><strong>Problema:</strong> ${message}</p>
+                <p><strong>Soluções:</strong></p>
+                <ul style="text-align: left;">
+                    <li>Permita o acesso à câmera quando solicitado</li>
+                    <li>Use HTTPS (necessário para câmera)</li>
+                    <li>Recarregue a página</li>
+                    <li>Use Chrome ou Firefox</li>
+                    <li>Verifique se outra aplicação não está usando a câmera</li>
+                </ul>
+                <button id="retry-btn" onclick="location.reload()" style="background: #28a745; color: white; border: none; padding: 10px 20px; border-radius: 5px; margin-top: 10px;">Tentar Novamente</button>
+            `;
+        }
+        
         // Função para fechar instruções
         function closeInstructions() {
             document.getElementById('instructions').classList.add('hide-instructions');
         }
 
-        // Auto-fechar instruções após 10 segundos
+        // Auto-fechar instruções após 15 segundos (mais tempo)
         setTimeout(() => {
             closeInstructions();
-        }, 10000);
+        }, 15000);
 
         // Detectar quando o marcador é encontrado
-        document.querySelector('#marker').addEventListener('markerFound', function() {
-            console.log('Marcador detectado! Mostrando cubo 3D...');
-            // Você pode adicionar efeitos sonoros ou outras interações aqui
-        });
+        document.addEventListener('DOMContentLoaded', function() {
+            // Esperar um pouco para os elementos carregarem
+            setTimeout(() => {
+                const marker = document.querySelector('#marker');
+                if (marker) {
+                    marker.addEventListener('markerFound', function() {
+                        console.log('Marcador detectado! Mostrando cubo 3D...');
+                    });
 
-        document.querySelector('#marker').addEventListener('markerLost', function() {
-            console.log('Marcador perdido!');
+                    marker.addEventListener('markerLost', function() {
+                        console.log('Marcador perdido!');
+                    });
+                }
+                
+                const mainCube = document.querySelector('#main-cube');
+                if (mainCube) {
+                    // Interação de clique no cubo
+                    mainCube.addEventListener('click', function() {
+                        const colors = ['#4CC3D9', '#EF2D5E', '#FFC65D', '#7BC8A4', '#4ECDC4', '#FF69B4', '#00CED1'];
+                        const randomColor = colors[Math.floor(Math.random() * colors.length)];
+                        this.setAttribute('color', randomColor);
+                    });
+                }
+            }, 2000);
         });
-
-        // Interação de clique no cubo
-        document.querySelector('#main-cube').addEventListener('click', function() {
-            // Muda cor aleatória quando clicado
-            const colors = ['#4CC3D9', '#EF2D5E', '#FFC65D', '#7BC8A4', '#4ECDC4', '#FF69B4', '#00CED1'];
-            const randomColor = colors[Math.floor(Math.random() * colors.length)];
-            this.setAttribute('color', randomColor);
+        
+        // Verificar câmera quando a página carregar
+        window.addEventListener('load', function() {
+            setTimeout(() => {
+                checkCameraSupport();
+            }, 1000);
         });
-
-        // Verificar se o dispositivo suporta AR
-        if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-            alert('Seu navegador não suporta acesso à câmera. Tente usar Chrome ou Firefox.');
+        
+        // Forçar HTTPS se necessário
+        if (location.protocol !== 'https:' && location.hostname !== 'localhost' && location.hostname !== '127.0.0.1') {
+            console.warn('HTTPS necessário para acesso à câmera em dispositivos móveis');
         }
     </script>
 </body>
