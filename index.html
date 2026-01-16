@@ -1,26 +1,219 @@
 <!DOCTYPE html>
-<html lang="pt-br">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>AR com Marcador Personalizado</title>
-    <script src="https://aframe.io/releases/1.4.2/aframe.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/gh/AR-js-org/AR.js/aframe/build/aframe-ar.js"></script>
+<html>
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Cubo 3D em Realidade Aumentada</title>
+    
+    <!-- A-Frame -->
+    <script src="https://aframe.io/releases/1.4.0/aframe.min.js"></script>
+    
+    <!-- AR.js -->
+    <script src="https://cdn.jsdelivr.net/gh/aframevr/ar.js@3.4.5/aframe/build/aframe-ar.min.js"></script>
+    
     <style>
-      body { margin: 0; overflow: hidden; }
-      #ar-container { width: 100vw; height: 100vh; }
+        body {
+            margin: 0;
+            font-family: Arial, sans-serif;
+        }
+        
+        #instructions {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            right: 10px;
+            background: rgba(0, 0, 0, 0.8);
+            color: white;
+            padding: 15px;
+            border-radius: 10px;
+            z-index: 1000;
+            font-size: 14px;
+            text-align: center;
+        }
+        
+        #instructions h3 {
+            margin: 0 0 10px 0;
+            color: #00ff88;
+        }
+        
+        .hide-instructions {
+            display: none;
+        }
+        
+        #close-btn {
+            background: #ff4444;
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 5px;
+            margin-top: 10px;
+            cursor: pointer;
+        }
     </style>
-  </head>
-  <body>
-    <div id="ar-container">
-      <a-scene embedded arjs="sourceType: webcam; debugUIEnabled: false;">
-        <!-- Use seu marcador personalizado gerado pelo AR.js -->
-        <a-marker type="pattern" url="arjs-marker.patt">
-          <a-box position="0 0.5 0" material="color: red;"></a-box>
-        </a-marker>
-        <a-entity camera></a-entity>
-      </a-scene>
+</head>
+<body>
+    <!-- Instruções -->
+    <div id="instructions">
+        <h3>📱 Como usar a Realidade Aumentada:</h3>
+        <p>1. Aponte a câmera para o marcador (imagem pattern-marker.png)</p>
+        <p>2. Mantenha o celular estável</p>
+        <p>3. O cubo 3D aparecerá sobre o marcador</p>
+        <p>4. Mova o celular ao redor para ver diferentes ângulos</p>
+        <button id="close-btn" onclick="closeInstructions()">Entendi!</button>
     </div>
-    <p style="position: absolute; top: 10px; left: 10px; color: white; background: rgba(0,0,0,0.5); padding: 8px; border-radius: 6px;">Aponte a câmera para o seu marcador personalizado para ver o cubo em AR.</p>
-  </body>
+
+    <!-- Cena AR -->
+    <a-scene 
+        embedded 
+        arjs="sourceType: webcam; debugUIEnabled: false; detectionMode: mono_and_matrix; matrixCodeType: 3x3;"
+        vr-mode-ui="enabled: false"
+        renderer="logarithmicDepthBuffer: true;">
+        
+        <!-- Configurações da câmera AR -->
+        <a-camera gps-camera rotation-reader arjs-camera></a-camera>
+        
+        <!-- Marcador AR -->
+        <a-marker 
+            preset="hiro" 
+            id="marker"
+            raycaster="objects: .clickable"
+            emitevents="true"
+            cursor="fuse: false; rayOrigin: mouse;">
+            
+            <!-- Cubo 3D Principal -->
+            <a-box 
+                id="main-cube"
+                position="0 0.5 0" 
+                rotation="0 45 0" 
+                scale="1 1 1" 
+                color="#4CC3D9"
+                metalness="0.3"
+                roughness="0.4"
+                animation="property: rotation; to: 360 405 360; loop: true; dur: 10000; easing: linear;"
+                class="clickable">
+                
+                <!-- Texto no cubo -->
+                <a-text 
+                    value="AR CUBE" 
+                    position="0 0 0.51" 
+                    align="center" 
+                    color="white" 
+                    scale="0.5 0.5 0.5">
+                </a-text>
+            </a-box>
+            
+            <!-- Cubos menores orbitando -->
+            <a-entity 
+                id="orbit-group"
+                animation="property: rotation; to: 0 360 0; loop: true; dur: 8000; easing: linear;">
+                
+                <a-box 
+                    position="2 0.5 0" 
+                    scale="0.3 0.3 0.3" 
+                    color="#EF2D5E"
+                    animation="property: rotation; to: 360 0 360; loop: true; dur: 3000; easing: linear;">
+                </a-box>
+                
+                <a-box 
+                    position="-2 0.5 0" 
+                    scale="0.3 0.3 0.3" 
+                    color="#FFC65D"
+                    animation="property: rotation; to: -360 0 -360; loop: true; dur: 3000; easing: linear;">
+                </a-box>
+                
+                <a-box 
+                    position="0 0.5 2" 
+                    scale="0.3 0.3 0.3" 
+                    color="#7BC8A4"
+                    animation="property: rotation; to: 0 360 0; loop: true; dur: 3000; easing: linear;">
+                </a-box>
+                
+                <a-box 
+                    position="0 0.5 -2" 
+                    scale="0.3 0.3 0.3" 
+                    color="#4ECDC4"
+                    animation="property: rotation; to: 0 -360 0; loop: true; dur: 3000; easing: linear;">
+                </a-box>
+            </a-entity>
+            
+            <!-- Partículas ao redor -->
+            <a-entity 
+                id="particles"
+                position="0 2 0">
+                <a-sphere 
+                    position="1 0 1" 
+                    radius="0.05" 
+                    color="yellow"
+                    animation="property: position; to: -1 2 -1; loop: true; dur: 4000; easing: easeInOutSine;">
+                </a-sphere>
+                <a-sphere 
+                    position="-1 0 1" 
+                    radius="0.05" 
+                    color="orange"
+                    animation="property: position; to: 1 2 -1; loop: true; dur: 4000; easing: easeInOutSine;">
+                </a-sphere>
+                <a-sphere 
+                    position="1 0 -1" 
+                    radius="0.05" 
+                    color="purple"
+                    animation="property: position; to: -1 2 1; loop: true; dur: 4000; easing: easeInOutSine;">
+                </a-sphere>
+            </a-entity>
+            
+            <!-- Luz ambiente -->
+            <a-light type="ambient" color="white" intensity="0.5"></a-light>
+            <a-light type="point" position="2 4 4" color="white" intensity="1"></a-light>
+        </a-marker>
+        
+        <!-- Marcador personalizado (se você quiser usar a imagem pattern-marker.png) -->
+        <!--
+        <a-marker 
+            type="pattern" 
+            url="pattern-marker.patt" 
+            id="custom-marker"
+            raycaster="objects: .clickable"
+            emitevents="true"
+            cursor="fuse: false; rayOrigin: mouse;">
+            
+            (mesmo conteúdo do cubo aqui)
+            
+        </a-marker>
+        -->
+    </a-scene>
+
+    <script>
+        // Função para fechar instruções
+        function closeInstructions() {
+            document.getElementById('instructions').classList.add('hide-instructions');
+        }
+
+        // Auto-fechar instruções após 10 segundos
+        setTimeout(() => {
+            closeInstructions();
+        }, 10000);
+
+        // Detectar quando o marcador é encontrado
+        document.querySelector('#marker').addEventListener('markerFound', function() {
+            console.log('Marcador detectado! Mostrando cubo 3D...');
+            // Você pode adicionar efeitos sonoros ou outras interações aqui
+        });
+
+        document.querySelector('#marker').addEventListener('markerLost', function() {
+            console.log('Marcador perdido!');
+        });
+
+        // Interação de clique no cubo
+        document.querySelector('#main-cube').addEventListener('click', function() {
+            // Muda cor aleatória quando clicado
+            const colors = ['#4CC3D9', '#EF2D5E', '#FFC65D', '#7BC8A4', '#4ECDC4', '#FF69B4', '#00CED1'];
+            const randomColor = colors[Math.floor(Math.random() * colors.length)];
+            this.setAttribute('color', randomColor);
+        });
+
+        // Verificar se o dispositivo suporta AR
+        if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+            alert('Seu navegador não suporta acesso à câmera. Tente usar Chrome ou Firefox.');
+        }
+    </script>
+</body>
 </html>
