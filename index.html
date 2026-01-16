@@ -15,10 +15,8 @@
       <a-scene
         embedded
         vr-mode-ui="enabled: false"
-        arjs="trackingMethod: best; sourceType: webcam; debugUIEnabled: false;"
-        webxr="optionalFeatures: hit-test;"
+        webxr="mode: ar; optionalFeatures: hit-test;"
         renderer="colorManagement: true; physicallyCorrectLights: true"
-        xrweb="mode: ar"
       >
         <a-entity camera look-controls></a-entity>
         <a-box position="0 0 -2" color="red" depth="0.5" height="0.5" width="0.5"></a-box>
