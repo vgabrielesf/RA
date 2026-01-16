@@ -125,6 +125,8 @@
     let lastTouchY = 0;
     let initialDistance = 0;
     let isScaling = false;
+    let touchStartTime = 0;
+    let hasMoved = false;
     
     infoDiv.innerHTML = '⚙️ Three.js carregado! Versão: ' + THREE.REVISION + '<br>📹 Ativando câmera...';
 
@@ -350,15 +352,21 @@
     function onTouchStart(event) {
       event.preventDefault();
       
-      if (!hasModelPlaced || !model || moveMode) return;
+      touchStartTime = Date.now();
+      hasMoved = false;
+      
+      // Se não tem modelo colocado, deixar o onTouchEnd tratar
+      if (!hasModelPlaced) {
+        return;
+      }
+      
+      if (!model || moveMode) return;
       
       if (event.touches.length === 1) {
-        // Um dedo - iniciar rotação
-        isRotating = true;
+        // Um dedo - preparar para rotação
         lastTouchX = event.touches[0].clientX;
         lastTouchY = event.touches[0].clientY;
         
-        infoDiv.innerHTML = '🔄 Rotacionando modelo...<br>👆 Use 2 dedos para zoom';
       } else if (event.touches.length === 2) {
         // Dois dedos - iniciar zoom
         isScaling = true;
@@ -378,9 +386,17 @@
     function onTouchMove(event) {
       event.preventDefault();
       
+      hasMoved = true; // Marca que houve movimento
+      
       if (!hasModelPlaced || !model || moveMode) return;
       
-      if (isRotating && event.touches.length === 1) {
+      if (event.touches.length === 1 && !isScaling) {
+        // Um dedo movendo - iniciar rotação se ainda não iniciou
+        if (!isRotating) {
+          isRotating = true;
+          infoDiv.innerHTML = '🔄 Rotacionando modelo...<br>👆 Use 2 dedos para zoom';
+        }
+        
         // Rotacionar modelo com um dedo
         const deltaX = event.touches[0].clientX - lastTouchX;
         const deltaY = event.touches[0].clientY - lastTouchY;
@@ -419,20 +435,43 @@
     function onTouchEnd(event) {
       event.preventDefault();
       
+      const touchDuration = Date.now() - touchStartTime;
+      
       if (isRotating || isScaling) {
         isRotating = false;
         isScaling = false;
         
         if (model) {
           const percentage = (model.scale.x / originalScale * 100).toFixed(0);
-          infoDiv.innerHTML = `✅ Modelo ajustado!<br>🔍 Tamanho: ${percentage}%<br>🎮 Use os controles para mais opções`;
+          infoDiv.innerHTML = `✅ Modelo ajustado!<br>🔍 Tamanho: ${percentage}%<br>👆 1 dedo = girar | ✌️ 2 dedos = zoom`;
+        }
+        return;
+      }
+      
+      // Toque simples: curto (menos de 300ms) e sem muito movimento
+      if (!hasMoved && touchDuration < 300 && event.changedTouches.length === 1) {
+        
+        if (!hasModelPlaced) {
+          // Colocar modelo
+          const fakeEvent = {
+            clientX: event.changedTouches[0].clientX,
+            clientY: event.changedTouches[0].clientY
+          };
+          placeModel(fakeEvent);
+          
+        } else if (moveMode && model) {
+          // Modo mover ativo
+          const fakeEvent = {
+            clientX: event.changedTouches[0].clientX,
+            clientY: event.changedTouches[0].clientY
+          };
+          onTouch(fakeEvent);
         }
       }
       
-      // Se não tem toques ativos e não está em modo mover, chamar onTouch para outras ações
-      if (event.touches.length === 0 && !moveMode) {
-        // Permite colocar modelo se não tiver sido colocado ainda
-      }
+      // Reset das variáveis
+      hasMoved = false;
+      touchStartTime = 0;
     }
     
     // Configurar eventos
